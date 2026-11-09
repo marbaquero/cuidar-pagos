@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>Pagos — Cuidadoras</title>
+<link rel="apple-touch-icon" href="icono-pagos-cuidadoras.png">
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Pagos" />
+
+<!-- ============================================================ -->
+<!-- CONFIGURACIÓN: credenciales de Supabase (proyecto de clientes) -->
+<!-- ============================================================ -->
+<script>
+  window.SUPABASE_URL = "https://fftnffmttuzfftntzzhu.supabase.co";
+  window.SUPABASE_ANON_KEY = "sb_publishable_f5py08cOv3Bdo0Yvm6lmbA_VBxnbEsP";
+  window.RECIBO_SEARCH_URL = "";
+</script>
+<!-- ============================================================ -->
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
+<style>
+:root{
+  --bg:#F5F5F0; --surface:#FFFFFF; --ink:#1E2B27; --muted:#6E7A75;
+  --primary:#256D6B; --primary-dark:#123F3D; --sage:#6F9A72; --amber:#C08A34; --brick:#A8493D;
+  --line:#E4E2D8; --ring-track:#E7E5DA;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;}
+#app{display:flex;min-height:100vh;width:100%;}
+.hidden{display:none !important;}
+
+.config-warning{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px;z-index:100;}
+.config-box{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:28px;max-width:440px;}
+.config-box h2{margin-top:0;}
+.config-box code{background:var(--bg);padding:2px 6px;border-radius:5px;font-family:var(--mono);font-size:12px;}
+
+/* Sidebar */
+.sidebar{width:230px;flex-shrink:0;background:var(--primary-dark);color:#EFF3F1;display:flex;flex-direction:column;padding:20px 14px;gap:14px;overflow-y:auto;}
+.brand{display:flex;align-items:center;gap:10px;padding:0 6px;}
+.brand-mark{width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:18px;}
+.brand-title{font-weight:700;font-size:14.5px;}
+.brand-sub{font-size:11px;color:rgba(255,255,255,0.55);}
+.nav{display:flex;flex-direction:column;gap:2px;flex-shrink:0;}
+.nav-group-label{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:rgba(255,255,255,0.4);padding:10px 12px 2px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;background:none;border:none;color:rgba(255,255,255,0.75);font-size:13.5px;cursor:pointer;text-align:left;font-family:var(--sans);width:100%;}
+.nav-item:hover{background:rgba(255,255,255,0.06);}
+.nav-item.active{background:rgba(255,255,255,0.14);color:#fff;font-weight:600;}
+.nav-icon{font-size:14px;width:18px;text-align:center;}
+.add-month-btn{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:9px;background:rgba(255,255,255,0.06);border:1px dashed rgba(255,255,255,0.25);color:rgba(255,255,255,0.7);font-size:12.5px;cursor:pointer;font-family:var(--sans);margin-top:4px;}
+.add-month-btn:hover{background:rgba(255,255,255,0.1);}
+.sidebar-foot{margin-top:4px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.12);flex-shrink:0;display:flex;flex-direction:column;gap:8px;}
+.admin-toggle{width:100%;display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.8);font-size:12px;cursor:pointer;font-family:var(--sans);}
+.admin-toggle.on{background:rgba(111,154,114,0.25);border-color:var(--sage);color:#fff;}
+.admin-toggle .dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,0.3);}
+.admin-toggle.on .dot{background:var(--sage);}
+
+/* Main */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:20px 28px 8px;flex-wrap:wrap;gap:8px;}
+.topbar h1{font-size:19px;margin:0;}
+.sync-pill{font-size:11px;color:var(--sage);background:rgba(111,154,114,0.12);padding:3px 9px;border-radius:20px;font-family:var(--mono);}
+.sync-banner{display:flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);background:rgba(111,154,114,0.10);color:var(--primary-dark);padding:8px 28px;border-bottom:1px solid var(--line);}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--sage);flex-shrink:0;animation:pulse 2s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+@media (max-width: 860px){.sync-banner{padding:8px 14px;} .sidebar{width:180px;}}
+.content{padding:12px 28px 100px;overflow-y:auto;}
+.label-eyebrow{font-size:10.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);font-weight:600;}
+
+.stack-lg{display:flex;flex-direction:column;gap:20px;}
+.stack{display:flex;flex-direction:column;gap:10px;}
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+@media (max-width: 760px){.stat-row{grid-template-columns:repeat(2,1fr);}}
+.mini-stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 10px;text-align:center;}
+.mini-stat-num{font-family:var(--mono);font-size:22px;font-weight:700;line-height:1.1;}
+.mini-stat-label{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-top:4px;}
+.mini-stat.mini-warn .mini-stat-num{color:var(--amber);}
+.mini-stat.mini-ok .mini-stat-num{color:var(--sage);}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;}
+.panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:10px;flex-wrap:wrap;}
+.panel-head h3{margin:0;font-size:15px;}
+.row-between{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.text-right{text-align:right;}
+.mono{font-family:var(--mono);}
+.strong{font-weight:700;}
+.muted{color:var(--muted);}
+.small{font-size:12px;}
+
+.badge{font-size:10.5px;font-weight:700;padding:4px 9px;border-radius:20px;white-space:nowrap;display:inline-block;}
+.badge-pend{background:rgba(192,138,52,0.15);color:var(--amber);}
+.badge-pagado{background:rgba(111,154,114,0.15);color:var(--sage);}
+.care-dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:7px;flex-shrink:0;}
+
+table.pay-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+table.pay-table th{text-align:left;font-size:10.5px;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted);padding:8px 8px;border-bottom:1px solid var(--line);white-space:nowrap;}
+table.pay-table td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:middle;}
+table.pay-table tr:last-child td{border-bottom:none;}
+table.pay-table input, table.pay-table select{width:100%;padding:6px 7px;border-radius:7px;border:1px solid var(--line);font-family:var(--sans);font-size:12px;background:var(--surface);}
+table.pay-table input[type=number]{max-width:80px;}
+.table-wrap{overflow-x:auto;}
+.link-cell{min-width:160px;}
+.link-cell a{color:var(--primary);text-decoration:none;font-weight:600;}
+.link-cell a:hover{text-decoration:underline;}
+.link-empty{color:var(--muted);font-style:italic;}
+.comp-admin{display:flex;flex-direction:column;gap:5px;}
+.comp-links{min-height:14px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;}
+.comp-edit-row{display:flex;gap:5px;align-items:center;}
+.comp-edit-row .f-comprobante{flex:1;}
+.comp-viewer{display:flex;align-items:center;gap:4px;flex-wrap:wrap;}
+.comp-link-item{display:inline-flex;align-items:center;gap:2px;}
+.comp-preview{margin-top:6px;}
+.comp-preview-frame{width:260px;height:300px;border-radius:8px;border:1px solid var(--line);box-shadow:0 4px 14px rgba(0,0,0,0.12);display:block;background:#fafafa;}
+.comp-preview-fallback{padding:6px 0;}
+.comp-preview-fallback a{color:var(--primary);font-weight:600;text-decoration:none;}
+.comp-preview-fallback a:hover{text-decoration:underline;}
+.row-actions{display:flex;gap:4px;}
+
+.summary-mini{display:grid;grid-template-columns:1.4fr repeat(4,0.9fr);gap:6px;font-size:12.5px;align-items:center;}
+.summary-mini-head{font-size:10.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);}
+.summary-mini-row{padding:8px 0;border-bottom:1px solid var(--line);}
+.summary-mini-row:last-child{border-bottom:none;}
+.progress-track{background:var(--ring-track);border-radius:20px;height:6px;overflow:hidden;margin-top:4px;}
+.progress-fill{height:100%;background:var(--sage);border-radius:20px;}
+
+.btn{border:none;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);}
+.btn:disabled{opacity:0.4;cursor:not-allowed;}
+.btn-primary{background:var(--primary);color:#fff;}
+.btn-primary:hover:not(:disabled){background:var(--primary-dark);}
+.btn-ghost{background:none;color:var(--muted);}
+.btn-ghost:hover:not(:disabled){background:var(--bg);}
+.btn-outline{background:none;border:1px solid var(--line);color:var(--ink);}
+.btn-danger{background:none;border:1px solid rgba(168,73,61,0.35);color:var(--brick);}
+.btn-danger:hover:not(:disabled){background:rgba(168,73,61,0.08);}
+.btn.sm{padding:5px 10px;font-size:11.5px;}
+.btn.icon{padding:5px 8px;}
+
+.modal-backdrop{position:fixed;inset:0;background:rgba(20,30,28,0.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px;}
+.modal{background:var(--surface);border-radius:16px;padding:24px;width:100%;max-width:420px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.25);}
+.modal h3{margin:6px 0 4px;font-size:17px;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px;}
+.form-grid label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);font-weight:600;}
+.form-grid input,.form-grid select{padding:9px 10px;border-radius:8px;border:1px solid var(--line);font-family:var(--sans);font-size:13.5px;color:var(--ink);}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;}
+.pin-modal{max-width:320px;}
+.pin-input{width:100%;margin-top:14px;padding:12px;font-size:20px;letter-spacing:6px;text-align:center;border-radius:9px;border:1px solid var(--line);font-family:var(--mono);}
+.error-text{color:var(--brick);font-size:12px;margin-top:8px;}
+.loader-ring{width:40px;height:40px;border-radius:50%;border:3px solid var(--ring-track);border-top-color:var(--primary);margin:0 auto;animation:spin 0.9s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--primary-dark);color:#fff;padding:10px 18px;border-radius:20px;font-size:12.5px;z-index:80;box-shadow:0 8px 24px rgba(0,0,0,0.2);}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* ---------------- Supabase / kv helpers ---------------- */
+let supa = null;
+let HOUSEHOLD_ID = null;
+function initSupabase(){
+  if (!window.SUPABASE_URL || window.SUPABASE_URL.includes("PASTE_") ||
+      !window.SUPABASE_ANON_KEY || window.SUPABASE_ANON_KEY.includes("PASTE_")){
+    document.getElementById("app").innerHTML = `
+      <div class="config-warning"><div class="config-box">
+        <h2>Configuración pendiente</h2>
+        <p>Falta configurar las credenciales de Supabase en <code>index.html</code>.</p>
+      </div></div>`;
+    return false;
+  }
+  supa = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+  return true;
+}
+
+// The owner session is the only way in. The household id comes from the
+// database, never from the URL or localStorage.
+async function initOwnerSession(){
+  const { data: { session }, error } = await supa.auth.getSession();
+  if (error || !session) {
+    location.replace("https://marbaquero.github.io/portal.html");
+    return null;
+  }
+  const { data: member, error: memberError } = await supa
+    .from("household_members")
+    .select("household_id, role")
+    .eq("user_id", session.user.id)
+    .eq("role", "owner")
+    .limit(1)
+    .maybeSingle();
+  if (memberError || !member) {
+    document.getElementById("app").innerHTML = `
+      <div class="config-warning"><div class="config-box">
+        <h2>Esta cuenta no está vinculada a un hogar</h2>
+        <p>Inicie sesión con la cuenta del propietario desde el portal.</p>
+      </div></div>`;
+    return null;
+  }
+  HOUSEHOLD_ID = member.household_id;
+  return session;
+}
+
+async function kvGet(key, fallback){
+  if (!HOUSEHOLD_ID) return fallback;
+  const { data, error } = await supa.from("app_kv_store")
+    .select("value")
+    .eq("household_id", HOUSEHOLD_ID)
+    .eq("key", key)
+    .maybeSingle();
+  if (error){ console.error("kvGet error", key, error); return fallback; }
+  return data ? data.value : fallback;
+}
+// Lectura estricta: distingue "error al leer" de "no existe todavía".
+async function kvGetStrict(key){
+  if (!HOUSEHOLD_ID) return { ok:false };
+  const { data, error } = await supa.from("app_kv_store")
+    .select("value")
+    .eq("household_id", HOUSEHOLD_ID)
+    .eq("key", key)
+    .maybeSingle();
+  if (error){ console.error("kvGet error", key, error); return { ok:false }; }
+  return { ok:true, value: data ? data.value : null };
+}
+async function kvSet(key, value){
+  if (!HOUSEHOLD_ID) return;
+  const { error } = await supa.from("app_kv_store").upsert({
+    household_id: HOUSEHOLD_ID,
+    key,
+    value,
+    updated_at: new Date().toISOString()
+  }, { onConflict: "household_id,key" });
+  if (error) console.error("kvSet error", key, error);
+}
+
+/* ---------------- Constants ---------------- */
+const MONTH_NAMES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+function scheduleTypeOf(c){
+  if (c && c.scheduleType) return c.scheduleType;
+  return "weekday";
+}
+const METODOS = ["Transferencia","Efectivo","Cheque","Otro"];
+
+// Feriados nacionales (YYYY-MM-DD). Cada feriado dentro de un período suma un día extra
+// (recargo del 100%): tarifa/5 para lun–vie y tarifa/2 para sáb–dom. Agregue aquí los siguientes.
+const FERIADOS = ["2026-10-09"];
+function holidayExtra(c, startD, endD){
+  if (!c) return 0;
+  const s = toISO(startD), e = toISO(endD);
+  const n = FERIADOS.filter(f => f >= s && f <= e).length;
+  if (!n) return 0;
+  const rate = Number(c.weeklyRate)||0;
+  return n * (scheduleTypeOf(c)==="weekend" ? rate/2 : rate/5);
+}
+// Período que le corresponde a una cuidadora a partir de la fecha de inicio:
+// lun–vie para turnos de semana (fecha = lunes), sáb–dom para fines de semana (fecha = sábado).
+function periodInfo(c, dateStr){
+  const start = parseISO(dateStr);
+  const end = addDays(start, scheduleTypeOf(c)==="weekend" ? 1 : 4);
+  return { start, end, periodo: periodoLabelRange(start,end), monto: (Number(c.weeklyRate)||0) + holidayExtra(c,start,end) };
+}
+
+/* ---------------- State ---------------- */
+const state = {
+  config: null, registros: [], adminPin: null, isAdmin: false,
+  view: "resumen", loaded:false
+};
+function monthKey(y,m){ return y+"-"+String(m).padStart(2,"0"); }
+function monthLabel(y,m){ return capitalize(MONTH_NAMES[m-1]) + " " + y; }
+function capitalize(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+function fmtMoney(n){ return "$" + (Math.round(n*100)/100).toFixed(2); }
+function fmtDate(dateStr){
+  const d = new Date(dateStr+"T00:00:00");
+  const dd = d.getDate();
+  const mon = capitalize(MONTH_NAMES[d.getMonth()].slice(0,3));
+  return dd + "-" + mon + "-" + d.getFullYear();
+}
+
+/* ---------------- Week generation ---------------- */
+function daysInMonth(y,m){ return new Date(y, m, 0).getDate(); }
+function genWeeks(y,m){
+  const total = daysInMonth(y,m);
+  const weeks = [];
+  let start = 1, n = 1;
+  while (start <= total){
+    let end = Math.min(start+6, total);
+    // last block absorbs remaining days if it would leave a stub of <4 days after it
+    if (total - end > 0 && total - end < 4) { end = total; }
+    weeks.push({ semana:n, startDay:start, endDay:end });
+    if (end >= total) break;
+    start = end+1; n++;
+  }
+  return weeks;
+}
+function periodoLabel(y,m,w){
+  const monShort = MONTH_NAMES[m-1];
+  return w.startDay + "–" + w.endDay + " " + monShort;
+}
+function isoDate(y,m,day){ return y+"-"+String(m).padStart(2,"0")+"-"+String(day).padStart(2,"0"); }
+
+/* ---- Monday–Friday weekly pay-period generator (used going forward from Sep 2026) ---- */
+function parseISO(s){ return new Date(s+"T00:00:00"); }
+function toISO(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function addDays(d, n){ const r = new Date(d); r.setDate(r.getDate()+n); return r; }
+function nextOrSameMonday(d){
+  const day = d.getDay(); // 0=Sun..6=Sat
+  const diff = day===0 ? 1 : day===1 ? 0 : 8-day; // days to add to reach Monday
+  return addDays(d, diff);
+}
+function mostRecentOrSameMonday(d){
+  const day = d.getDay(); // 0=Sun..6=Sat
+  const diff = day===0 ? -6 : 1-day; // days to subtract to reach this week's Monday
+  return addDays(d, diff);
+}
+function periodoLabelRange(startD, endD){
+  const sMon = MONTH_NAMES[startD.getMonth()];
+  const eMon = MONTH_NAMES[endD.getMonth()];
+  if (startD.getMonth()===endD.getMonth()) return startD.getDate()+"–"+endD.getDate()+" "+sMon;
+  return startD.getDate()+" "+sMon.slice(0,3)+" – "+endD.getDate()+" "+eMon.slice(0,3);
+}
+
+// Called when admin edits a row's Fecha. Sincroniza la semana de pago: busca las demás filas
+// PENDIENTES que pertenecen a la misma semana (mismo lunes, según su fecha actual: lun–vie usa el
+// lunes, sáb–dom usa el sábado menos 5 días) y las mueve a la nueva semana, cada cuidadora según su
+// propio turno. Las filas ya pagadas nunca se tocan, y una fila nueva sin hermanas solo cambia ella.
+function syncWeekFromDateEdit(editedRow, newDateStr){
+  if (!newDateStr) return;
+  const mondayOf = (row)=>{
+    const t = scheduleTypeOf(caregiverById(row.cuidadoraId));
+    const d = parseISO(row.fecha);
+    return t === "weekend" ? addDays(d, -5) : d;
+  };
+  const editedType = scheduleTypeOf(caregiverById(editedRow.cuidadoraId));
+  const newDate = parseISO(newDateStr);
+  const monday = editedType === "weekend" ? addDays(newDate, -5) : newDate;
+  const oldMondayISO = toISO(mondayOf(editedRow));
+
+  const siblings = state.registros.filter(x=>{
+    if (x === editedRow) return true;
+    if (x.estado === "Pagado") return false;
+    return toISO(mondayOf(x)) === oldMondayISO;
+  });
+
+  siblings.forEach(row=>{
+    const c = caregiverById(row.cuidadoraId);
+    const type = scheduleTypeOf(c);
+    if (type === "weekend"){
+      const sat = addDays(monday, 5);
+      const sun = addDays(monday, 6);
+      row.fecha = toISO(sat);
+      row.periodo = periodoLabelRange(sat, sun);
+    } else {
+      const fri = addDays(monday, 4);
+      row.fecha = toISO(monday);
+      row.periodo = periodoLabelRange(monday, fri);
+    }
+    // Monto (con feriados) para filas pendientes
+    if (row.estado !== "Pagado") row.monto = periodInfo(c, row.fecha).monto;
+  });
+
+  // Semana = posición de la fila (según su fecha) entre las filas de la misma cuidadora en esa pestaña.
+  // Solo se renumeran las filas pendientes; las pagadas conservan su número (los recibos se buscan por "Semana N").
+  siblings.forEach(row=>{
+    if (row.estado === "Pagado") return;
+    const before = state.registros.filter(x=> x!==row && x.cuidadoraId===row.cuidadoraId &&
+      x.year===row.year && x.month===row.month && x.fecha < row.fecha).length;
+    row.semana = before + 1;
+  });
+
+  persistRegistros();
+  render();
+  showToast(siblings.length>1 ? ("Semana actualizada ("+siblings.length+" filas pendientes).") : "Fecha actualizada.");
+}
+// Finds the Monday to start the NEXT weekly period from, based on the latest
+// Monday–Friday-style row already in state (its fecha + 4 days = Friday), or
+// today if there's no prior weekly-style row yet.
+function nextWeeklyStartMonday(){
+  const weeklyRows = state.registros.filter(r=>r.periodStyle==="weekday");
+  if (!weeklyRows.length){
+    return mostRecentOrSameMonday(new Date());
+  }
+  let latestFriday = null;
+  weeklyRows.forEach(r=>{
+    const friday = addDays(parseISO(r.fecha), 4);
+    if (!latestFriday || friday > latestFriday) latestFriday = friday;
+  });
+  return nextOrSameMonday(addDays(latestFriday, 1));
+}
+// Generates `count` consecutive Monday–Friday periods starting at startMonday,
+// one row per caregiver per week. Each week is filed under the calendar
+// month/year of its Friday (payment day), so it shows up in the right tab
+// even if the week itself spans a month boundary.
+function generateWeekdayPeriods(startMonday, count, caregivers){
+  const rows = [];
+  let monday = new Date(startMonday);
+  for (let i=0; i<count; i++){
+    const friday = addDays(monday, 4);
+    const y = friday.getFullYear(), m = friday.getMonth()+1;
+    caregivers.forEach(c=>{
+      const weekend = scheduleTypeOf(c) === "weekend";
+      // Turnos de semana: lun–vie. Fin de semana: el sábado y domingo que siguen a esa semana.
+      const start = weekend ? addDays(monday, 5) : monday;
+      const info = periodInfo(c, toISO(start));
+      rows.push({
+        id: "r_wk_"+toISO(start)+"_"+c.id+"_"+Math.random().toString(36).slice(2,7),
+        year:y, month:m, semana:null,
+        periodStyle: weekend ? "weekend" : "weekday",
+        cuidadoraId:c.id,
+        fecha: toISO(start),
+        periodo: info.periodo,
+        monto: info.monto,
+        metodo: "Transferencia",
+        estado: "Pendiente",
+        comprobante: ""
+      });
+    });
+    monday = addDays(monday, 7);
+  }
+  return rows;
+}
+// Siguiente número de semana para una cuidadora dentro de un mes (para que el enlace
+// automático de recibos, que busca por "Semana N", funcione en las filas nuevas).
+function nextSemanaFor(y, m, cid, extraRows){
+  let max = 0;
+  state.registros.concat(extraRows||[]).forEach(r=>{
+    if (r.year===y && r.month===m && r.cuidadoraId===cid){
+      const n = parseInt(r.semana,10);
+      if (!isNaN(n) && n>max) max = n;
+    }
+  });
+  return max + 1;
+}
+
+function generateMonthRegistros(y,m,caregivers){
+  const weeks = genWeeks(y,m);
+  const rows = [];
+  caregivers.forEach(c=>{
+    if (scheduleTypeOf(c) === "weekend"){
+      // Fines de semana: un pago por cada sábado del mes (sáb–dom).
+      let n = 1;
+      for (let d=1; d<=daysInMonth(y,m); d++){
+        const dt = new Date(y, m-1, d);
+        if (dt.getDay() !== 6) continue;
+        const info = periodInfo(c, toISO(dt));
+        rows.push({
+          id: "r_"+y+"_"+m+"_"+c.id+"_"+n+"_"+Math.random().toString(36).slice(2,7),
+          year:y, month:m, semana:n, periodStyle:"weekend",
+          cuidadoraId:c.id, fecha:toISO(dt), periodo:info.periodo, monto:info.monto,
+          metodo:"Transferencia", estado:"Pendiente", comprobante:""
+        });
+        n++;
+      }
+      return;
+    }
+    weeks.forEach(w=>{
+      rows.push({
+        id: "r_"+y+"_"+m+"_"+c.id+"_"+w.semana+"_"+Math.random().toString(36).slice(2,7),
+        year:y, month:m, semana:w.semana,
+        cuidadoraId:c.id,
+        fecha: isoDate(y,m,w.startDay),
+        periodo: periodoLabel(y,m,w),
+        monto: c.weeklyRate,
+        metodo: "Transferencia",
+        estado: "Pendiente",
+        comprobante: ""
+      });
+    });
+  });
+  return rows;
+}
+
+/* ---------------- Load / bootstrap ---------------- */
+async function loadAll(){
+  const [cfgR, regsR] = await Promise.all([
+    kvGetStrict("pagos_config"),
+    kvGetStrict("pagos_registros")
+  ]);
+  if (!cfgR.ok || !regsR.ok){
+    // No se pudo leer: NO se crea ni se guarda nada. Se ofrece reintentar.
+    document.getElementById("app").innerHTML = `
+      <div class="config-warning"><div class="config-box">
+        <h2>No se pudieron cargar los datos</h2>
+        <p>Hubo un problema de conexión con la base de datos. No se modificó nada.</p>
+        <button class="btn btn-primary" id="retry-load">Reintentar</button>
+      </div></div>`;
+    document.getElementById("retry-load").addEventListener("click", ()=>{ loadAll(); });
+    return;
+  }
+  const cfg = cfgR.value, regs = regsR.value;
+  // A new household starts with no caregivers and no payments. Nothing is
+  // copied from the pilot family and nothing is auto-generated.
+  state.config = (cfg && Array.isArray(cfg.caregivers)) ? cfg : { caregivers: [] };
+  state.registros = Array.isArray(regs) ? regs : [];
+  state.adminPin = null;
+  state.isAdmin = true;
+
+  const months = distinctMonths();
+  state.view = months.length ? monthKeyOf(months[0]) : "resumen";
+  state.loaded = true;
+  render();
+}
+
+function distinctMonths(){
+  const seen = {};
+  state.registros.forEach(r=>{ seen[monthKey(r.year,r.month)] = {year:r.year, month:r.month}; });
+  return Object.keys(seen).sort().map(k=>seen[k]);
+}
+function monthKeyOf(m){ return monthKey(m.year,m.month); }
+
+/* ---------------- Persistence ---------------- */
+let syncTimer=null;
+function flashSync(){
+  const pill = document.getElementById("sync-pill");
+  if (pill){ pill.textContent="Guardando…"; }
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(()=>{ const p=document.getElementById("sync-pill"); if(p) p.textContent="Sincronizado"; }, 700);
+}
+async function persistRegistros(){ await kvSet("pagos_registros", state.registros); flashSync(); }
+async function persistConfig(){ await kvSet("pagos_config", state.config); flashSync(); }
+
+function showToast(msg){
+  const t = document.createElement("div");
+  t.className="toast"; t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 2400);
+}
+
+/* ---------------- Admin / PIN ---------------- */
+function requireAdmin(action){
+  if (state.isAdmin){ action(); return; }
+  state.pendingAction = action;
+  openPinModal(state.adminPin ? "enter" : "set");
+}
+function openPinModal(mode){
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  backdrop.innerHTML = `
+    <div class="modal pin-modal">
+      <h3>${mode==="set" ? "Crear PIN de administrador" : "Ingrese su PIN"}</h3>
+      <p class="muted small">${mode==="set" ? "Este PIN protege los cambios en pagos. Es el mismo que usa el inventario de medicinas." : "Se requiere PIN para editar montos, estados y comprobantes."}</p>
+      <input autofocus type="password" inputmode="numeric" class="pin-input" placeholder="••••" maxlength="12" />
+      <div class="error-text hidden" id="pin-error"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="pin-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="pin-submit" disabled>${mode==="set" ? "Guardar PIN" : "Entrar"}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(backdrop);
+  const input = backdrop.querySelector(".pin-input");
+  const submitBtn = backdrop.querySelector("#pin-submit");
+  const errEl = backdrop.querySelector("#pin-error");
+  input.addEventListener("input", ()=>{ submitBtn.disabled = input.value.length < 3; });
+  backdrop.querySelector("#pin-cancel").addEventListener("click", ()=>{ state.pendingAction=null; backdrop.remove(); });
+  submitBtn.addEventListener("click", async ()=>{
+    const val = input.value;
+    if (mode==="set"){
+      await kvSet("settings", { adminPin: val });
+      state.adminPin = val; state.isAdmin = true;
+      backdrop.remove(); render();
+      showToast("PIN creado. Modo administrador activo.");
+      if (state.pendingAction){ state.pendingAction(); state.pendingAction=null; }
+    } else {
+      if (val === state.adminPin){
+        state.isAdmin = true;
+        backdrop.remove(); render();
+        showToast("Modo administrador activo.");
+        if (state.pendingAction){ state.pendingAction(); state.pendingAction=null; }
+      } else {
+        errEl.textContent = "PIN incorrecto. Intente de nuevo.";
+        errEl.classList.remove("hidden");
+        input.value=""; input.focus();
+      }
+    }
+  });
+}
+function toggleAdmin(){
+  // The owner is already authenticated by Supabase. The old 4-digit PIN was
+  // client-side only and is no longer used as a security boundary.
+  showToast("Sesión de administrador activa.");
+}
+
+/* ---------------- Derived calcs ---------------- */
+function caregiverById(id){ return state.config.caregivers.find(c=>c.id===id); }
+function activeCaregivers(){ return state.config.caregivers.filter(c=>!c.inactive); }
+function rowsForMonth(y,m){ return state.registros.filter(r=>r.year===y && r.month===m); }
+function totals(rows){
+  let total=0, pagado=0;
+  rows.forEach(r=>{ total += Number(r.monto)||0; if (r.estado==="Pagado") pagado += Number(r.monto)||0; });
+  return { total, pagado, pendiente: total-pagado, pct: total>0 ? Math.round((pagado/total)*100) : 0 };
+}
+function summaryByCaregiver(rows){
+  return state.config.caregivers.filter(c=>!c.inactive || rows.some(r=>r.cuidadoraId===c.id)).map(c=>{
+    const crows = rows.filter(r=>r.cuidadoraId===c.id);
+    const t = totals(crows);
+    return { caregiver:c, ...t };
+  });
+}
+
+/* ---------------- Rendering ---------------- */
+function render(){
+  const app = document.getElementById("app");
+  if (!state.loaded){
+    app.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;width:100%;min-height:100vh;"><div class="loader-ring"></div></div>`;
+    return;
+  }
+  const months = distinctMonths();
+  app.innerHTML = `
+    <div class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">💵</div>
+        <div><div class="brand-title">Pagos — Cuidadoras</div><div class="brand-sub">Pagos del hogar</div></div>
+      </div>
+      <div class="nav">
+        <button class="nav-item ${state.view==='resumen'?'active':''}" data-view="resumen"><span class="nav-icon">📊</span>Resumen anual</button>
+        <div class="nav-group-label">Meses</div>
+        ${months.map(m=>{
+          const k = monthKeyOf(m);
+          return `<button class="nav-item ${state.view===k?'active':''}" data-view="${k}"><span class="nav-icon">🗓️</span>${monthLabel(m.year,m.month)}</button>`;
+        }).join("")}
+      </div>
+      <div class="sidebar-foot">
+        ${state.isAdmin && state.config.caregivers.length ? `<button class="admin-toggle" id="add-month-btn"><span class="dot" style="background:var(--amber)"></span>Agregar pago</button>` : ""}
+        ${state.isAdmin ? `<button class="admin-toggle" id="add-care-btn"><span class="dot" style="background:var(--amber)"></span>Agregar cuidadora</button>` : ""}
+        ${state.isAdmin && state.config.caregivers.length ? `<button class="admin-toggle" id="edit-rates-btn"><span class="dot" style="background:var(--amber)"></span>Editar tarifas</button>` : ""}
+        <button class="admin-toggle ${state.isAdmin?'on':''}" id="admin-toggle"><span class="dot"></span>${state.isAdmin ? "Administrador activo" : "Modo administrador"}</button>
+      </div>
+    </div>
+    <div class="main">
+      <div class="sync-banner"><span class="sync-dot"></span><span id="sync-pill">Sincronizado</span> · datos compartidos en tiempo real</div>
+      <div class="content stack-lg" id="content"></div>
+    </div>`;
+
+  document.querySelectorAll(".nav-item[data-view]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{ state.view = btn.dataset.view; render(); });
+  });
+  document.getElementById("admin-toggle").addEventListener("click", toggleAdmin);
+  const addBtn = document.getElementById("add-month-btn");
+  if (addBtn) addBtn.addEventListener("click", ()=>{
+    let y,m;
+    if (state.view && state.view!=="resumen") { [y,m] = state.view.split("-").map(Number); }
+    else {
+      const ms=distinctMonths(); const now=new Date();
+      const cur=ms.find(x=>x.year===now.getFullYear()&&x.month===now.getMonth()+1)||ms[0];
+      if(cur){ y=cur.year; m=cur.month; } else { y=now.getFullYear(); m=now.getMonth()+1; }
+    }
+    openAddRowModal(y,m);
+  });
+  const addCareBtn = document.getElementById("add-care-btn");
+  if (addCareBtn) addCareBtn.addEventListener("click", openAddCaregiverModal);
+  const ratesBtn = document.getElementById("edit-rates-btn");
+  if (ratesBtn) ratesBtn.addEventListener("click", openEditRatesModal);
+
+  const content = document.getElementById("content");
+  if (!state.config.caregivers.length) {
+    renderSetup(content);
+  } else if (state.view === "resumen") {
+    renderResumenAnual(content);
+  } else {
+    const [y,m] = state.view.split("-").map(Number);
+    renderMonth(content, y, m);
+  }
+}
+
+function renderSetup(content){
+  content.innerHTML = `
+    <div class="panel" style="max-width:640px;margin:24px auto;padding:36px 28px;text-align:center;">
+      <div class="label-eyebrow">Hogar nuevo</div>
+      <h2 style="margin:8px 0 6px;">Configura a tus cuidadoras</h2>
+      <p class="muted" style="max-width:460px;margin:0 auto 18px;">
+        Este hogar no tiene datos de otra familia. Agrega la primera cuidadora para empezar a registrar pagos.
+      </p>
+      <button class="btn btn-primary" id="setup-add-care">+ Agregar la primera cuidadora</button>
+    </div>`;
+  document.getElementById("setup-add-care").addEventListener("click", openAddCaregiverModal);
+}
+
+function renderResumenAnual(content){
+  const months = distinctMonths();
+  const allRows = state.registros;
+  const t = totals(allRows);
+  const byCaregiver = summaryByCaregiver(allRows);
+
+  content.innerHTML = `
+    <div class="stack">
+      <div class="label-eyebrow">Resumen anual · todos los meses cargados</div>
+      <div class="stat-row">
+        <div class="mini-stat"><div class="mini-stat-num">${fmtMoney(t.total)}</div><div class="mini-stat-label">Total</div></div>
+        <div class="mini-stat mini-ok"><div class="mini-stat-num">${fmtMoney(t.pagado)}</div><div class="mini-stat-label">Pagado</div></div>
+        <div class="mini-stat mini-warn"><div class="mini-stat-num">${fmtMoney(t.pendiente)}</div><div class="mini-stat-label">Pendiente</div></div>
+        <div class="mini-stat"><div class="mini-stat-num">${t.pct}%</div><div class="mini-stat-label">Completado</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>Por cuidadora (año completo)</h3></div>
+      <div class="stack">
+        ${byCaregiver.map(s=>`
+          <div class="summary-mini-row">
+            <div class="row-between">
+              <div><span class="care-dot" style="background:${s.caregiver.color}"></span><span class="strong">${s.caregiver.name}</span> <span class="muted small">· ${s.caregiver.turno}</span></div>
+              <div class="mono small">${fmtMoney(s.pagado)} / ${fmtMoney(s.total)}</div>
+            </div>
+            <div class="progress-track"><div class="progress-fill" style="width:${s.pct}%;background:${s.caregiver.color}"></div></div>
+          </div>`).join("")}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>Por mes</h3></div>
+      <div class="table-wrap">
+        <table class="pay-table">
+          <thead><tr><th>Mes</th><th>Total</th><th>Pagado</th><th>Pendiente</th><th>% Completado</th></tr></thead>
+          <tbody>
+            ${months.map(m=>{
+              const mt = totals(rowsForMonth(m.year,m.month));
+              return `<tr>
+                <td class="strong">${monthLabel(m.year,m.month)}</td>
+                <td class="mono">${fmtMoney(mt.total)}</td>
+                <td class="mono">${fmtMoney(mt.pagado)}</td>
+                <td class="mono">${fmtMoney(mt.pendiente)}</td>
+                <td class="mono">${mt.pct}%</td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderMonth(content, y, m){
+  const rows = rowsForMonth(y,m).sort((a,b)=> a.cuidadoraId===b.cuidadoraId ? String(a.fecha).localeCompare(String(b.fecha)) : a.cuidadoraId.localeCompare(b.cuidadoraId));
+  const t = totals(rows);
+  const byCaregiver = summaryByCaregiver(rows);
+
+  content.innerHTML = `
+    <div class="row-between">
+      <div class="label-eyebrow">${monthLabel(y,m)} · Cobertura 24/7</div>
+    </div>
+
+    <div class="stat-row">
+      <div class="mini-stat"><div class="mini-stat-num">${fmtMoney(t.total)}</div><div class="mini-stat-label">Total del mes</div></div>
+      <div class="mini-stat mini-ok"><div class="mini-stat-num">${fmtMoney(t.pagado)}</div><div class="mini-stat-label">Pagado</div></div>
+      <div class="mini-stat mini-warn"><div class="mini-stat-num">${fmtMoney(t.pendiente)}</div><div class="mini-stat-label">Pendiente</div></div>
+      <div class="mini-stat"><div class="mini-stat-num">${t.pct}%</div><div class="mini-stat-label">Completado</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>Detalle de pagos</h3></div>
+      <div class="table-wrap">
+        <table class="pay-table">
+          <thead><tr>
+            <th>Fecha</th><th>Cuidadora</th><th>Semana</th><th>Período</th><th>Monto</th><th>Método</th><th>Estado</th><th>Comprobante</th>${state.isAdmin?"<th></th>":""}
+          </tr></thead>
+          <tbody id="rows-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>Resumen por cuidadora</h3></div>
+      <div class="stack">
+        ${byCaregiver.map(s=>`
+          <div class="summary-mini-row">
+            <div class="row-between">
+              <div><span class="care-dot" style="background:${s.caregiver.color}"></span><span class="strong">${s.caregiver.name}</span> <span class="muted small">· ${s.caregiver.turno}</span></div>
+              <div class="mono small">${fmtMoney(s.pagado)} / ${fmtMoney(s.total)} <span class="muted">(${s.pct}%)</span></div>
+            </div>
+            <div class="progress-track"><div class="progress-fill" style="width:${s.pct}%;background:${s.caregiver.color}"></div></div>
+          </div>`).join("")}
+      </div>
+    </div>`;
+
+  const body = document.getElementById("rows-body");
+  body.innerHTML = rows.map(r => rowHtml(r)).join("");
+  rows.forEach(r => wireRow(r));
+
+  const addBtn = document.getElementById("add-row-btn");
+  if (addBtn) addBtn.addEventListener("click", ()=> openAddRowModal(y,m));
+}
+
+function splitLinks(comprobante){ return (comprobante||"").split("|").map(s=>s.trim()).filter(Boolean); }
+
+function extractDriveFileId(url){
+  if (!url) return null;
+  let m = url.match(/\/d\/([a-zA-Z0-9_-]{10,})/);
+  if (m) return m[1];
+  m = url.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+  if (m) return m[1];
+  return null;
+}
+function drivePreviewEmbedUrl(fileId){
+  return "https://drive.google.com/file/d/" + fileId + "/preview";
+}
+function comprobanteLinksHtml(links){
+  return links.map((url,i)=>{
+    const label = links.length>1 ? "Recibo "+(i+1) : "Ver comprobante";
+    const fileId = extractDriveFileId(url);
+    const previewBtn = fileId
+      ? `<button class="btn btn-ghost sm icon f-preview-toggle" data-fileid="${fileId}" data-url="${url}" title="Vista previa">👁</button>`
+      : "";
+    return `<span class="comp-link-item"><a href="${url}" target="_blank" rel="noopener">${label}</a>${previewBtn}</span>`;
+  }).join(" · ");
+}
+
+function comprobanteHtml(r){
+  const links = splitLinks(r.comprobante);
+  const viewerLinks = links.length ? comprobanteLinksHtml(links) : `<span class="link-empty">Sin enlace</span>`;
+  const previewSlot = `<div class="comp-preview hidden"><iframe class="comp-preview-frame" src="" allow="autoplay" title="Vista previa del comprobante"></iframe><div class="comp-preview-fallback hidden small muted">No se pudo cargar la vista previa. <a class="comp-preview-openlink" href="#" target="_blank" rel="noopener">Abrir en Drive</a></div></div>`;
+  if (!state.isAdmin) return `<div class="comp-viewer">${viewerLinks}</div>${previewSlot}`;
+  if (links.length){
+    // Already has a link: show just the viewer link + a small edit toggle + buscar.
+    return `
+      <div class="comp-admin">
+        <div class="comp-links small">
+          ${viewerLinks}
+          <button class="btn btn-ghost sm icon f-edit-comp" title="Editar enlace">✎</button>
+          <button class="btn btn-ghost sm icon f-buscar" title="Buscar en Drive" data-id="${r.id}">🔍</button>
+        </div>
+        <div class="comp-edit-row hidden">
+          <input type="text" class="f-comprobante" placeholder="Pegar enlace aquí (o usar Buscar)" value="${r.comprobante||''}" />
+        </div>
+      </div>${previewSlot}`;
+  }
+  // No link yet: show the input directly so admin can paste or search.
+  return `
+    <div class="comp-admin">
+      <div class="comp-edit-row">
+        <input type="text" class="f-comprobante" placeholder="Pegar enlace aquí (o usar Buscar)" value="" />
+        <button class="btn btn-outline sm icon f-buscar" title="Buscar en Drive" data-id="${r.id}">🔍</button>
+      </div>
+    </div>`;
+}
+
+function jsonpRequest(url){
+  return new Promise((resolve, reject) => {
+    const cbName = "jsonp_cb_" + Date.now() + "_" + Math.floor(Math.random()*1e6);
+    const script = document.createElement("script");
+    let settled = false;
+    const cleanup = () => { delete window[cbName]; script.remove(); };
+    window[cbName] = (data) => { settled = true; cleanup(); resolve(data); };
+    script.onerror = () => { if (!settled){ cleanup(); reject(new Error("No se pudo cargar la respuesta de Apps Script.")); } };
+    const sep = url.indexOf("?") === -1 ? "?" : "&";
+    script.src = url + sep + "callback=" + cbName;
+    document.body.appendChild(script);
+    setTimeout(() => { if (!settled){ cleanup(); reject(new Error("Tiempo de espera agotado.")); } }, 12000);
+  });
+}
+
+async function buscarComprobante(r, opts){
+  opts = opts || {};
+  if (!window.RECIBO_SEARCH_URL || window.RECIBO_SEARCH_URL.includes("PASTE_")){
+    showToast("Falta configurar la URL de búsqueda de recibos (Apps Script).");
+    return;
+  }
+  if (!r.semana){
+    showToast("Esta fila no tiene número de semana — escríbalo en la columna Semana para poder buscar el recibo, o pegue el enlace manualmente.");
+    return;
+  }
+  const c = caregiverById(r.cuidadoraId);
+  if (!c) return;
+  const cell = document.getElementById("comp-cell-"+r.id);
+  if (cell) cell.innerHTML = `<span class="muted small">Buscando…</span>`;
+  try {
+    const mesNombre = capitalize(MONTH_NAMES[r.month-1]);
+    const url = window.RECIBO_SEARCH_URL
+      + "?mes=" + encodeURIComponent(mesNombre)
+      + "&cuidadora=" + encodeURIComponent(c.name)
+      + "&semana=" + encodeURIComponent(r.semana);
+    const data = await jsonpRequest(url);
+    if (data.matches && data.matches.length){
+      r.comprobante = data.matches.map(m=>m.url).join(" | ");
+      await persistRegistros();
+      showToast(data.matches.length>1 ? (data.matches.length+" recibos vinculados.") : "Recibo vinculado.");
+    } else if (data.error) {
+      console.error("buscarComprobante server error", data.error);
+      showToast("Apps Script: " + data.error);
+    } else {
+      showToast("No se encontró recibo en Drive todavía. Puede pegar el enlace manualmente.");
+    }
+  } catch(err){
+    console.error("buscarComprobante error", err);
+    showToast("Error al buscar el recibo. Verifique la URL de Apps Script.");
+  }
+  const tr = document.querySelector(`tr[data-id="${r.id}"]`);
+  if (tr){ tr.outerHTML = rowHtml(r); wireRow(r); }
+}
+
+function rowHtml(r){
+  const c = caregiverById(r.cuidadoraId);
+  const badgeClass = r.estado==="Pagado" ? "badge-pagado" : "badge-pend";
+  const semanaLabel = r.semana ? ("Semana "+r.semana) : "—";
+  return `<tr data-id="${r.id}">
+    <td>${state.isAdmin ? `<input type="date" class="f-fecha mono" value="${r.fecha}" />` : `<span class="mono">${fmtDate(r.fecha)}</span>`}</td>
+    <td><span class="care-dot" style="background:${c?c.color:'#999'}"></span>${c?c.name:r.cuidadoraId}</td>
+    <td>${state.isAdmin ? `<input type="text" class="f-semana" value="${r.semana||''}" placeholder="—" style="max-width:70px;" />` : semanaLabel}</td>
+    <td>${state.isAdmin ? `<input type="text" class="f-periodo" value="${r.periodo}" />` : r.periodo}</td>
+    <td>${state.isAdmin ? `<input type="number" step="0.01" class="f-monto" value="${r.monto}" />` : fmtMoney(r.monto)}</td>
+    <td>${state.isAdmin ? `<select class="f-metodo">${METODOS.map(x=>`<option ${x===r.metodo?'selected':''}>${x}</option>`).join("")}</select>` : r.metodo}</td>
+    <td>${state.isAdmin
+        ? `<select class="f-estado"><option ${r.estado==='Pendiente'?'selected':''}>Pendiente</option><option ${r.estado==='Pagado'?'selected':''}>Pagado</option></select>`
+        : `<span class="badge ${badgeClass}">${r.estado}</span>`}</td>
+    <td class="link-cell" id="comp-cell-${r.id}">${comprobanteHtml(r)}</td>
+    ${state.isAdmin ? `<td><button class="btn btn-danger icon sm f-delete" title="Eliminar fila">✕</button></td>` : ""}
+  </tr>`;
+}
+
+function wireRow(r){
+  const tr = document.querySelector(`tr[data-id="${r.id}"]`);
+  if (!tr) return;
+  const fechaEl = tr.querySelector(".f-fecha");
+  if (fechaEl) fechaEl.addEventListener("change", ()=>{
+    syncWeekFromDateEdit(r, fechaEl.value);
+  });
+  const semanaEl = tr.querySelector(".f-semana");
+  if (semanaEl) semanaEl.addEventListener("change", ()=>{
+    const v = semanaEl.value.trim();
+    r.semana = v === "" ? null : (isNaN(parseInt(v,10)) ? v : parseInt(v,10));
+    persistRegistros();
+  });
+  const periodoEl = tr.querySelector(".f-periodo");
+  if (periodoEl) periodoEl.addEventListener("change", ()=>{ r.periodo = periodoEl.value; persistRegistros(); });
+  const montoEl = tr.querySelector(".f-monto");
+  if (montoEl) montoEl.addEventListener("change", ()=>{ r.monto = parseFloat(montoEl.value)||0; persistRegistros(); renderCurrentMonthTotalsOnly(); });
+  const metodoEl = tr.querySelector(".f-metodo");
+  if (metodoEl) metodoEl.addEventListener("change", ()=>{ r.metodo = metodoEl.value; persistRegistros(); });
+  const estadoEl = tr.querySelector(".f-estado");
+  if (estadoEl) estadoEl.addEventListener("change", ()=>{
+    const wasPagado = r.estado === "Pagado";
+    r.estado = estadoEl.value;
+    persistRegistros();
+    render();
+    if (r.estado==="Pagado" && !wasPagado && !r.comprobante){
+      buscarComprobante(r);
+    }
+  });
+  wireComprobanteCell(r);
+  const delEl = tr.querySelector(".f-delete");
+  if (delEl) delEl.addEventListener("click", ()=>{
+    if (!confirm("¿Eliminar esta fila de pago?")) return;
+    state.registros = state.registros.filter(x=>x.id!==r.id);
+    persistRegistros(); render();
+  });
+}
+function renderCurrentMonthTotalsOnly(){ render(); }
+
+function wireComprobanteCell(r){
+  const cell = document.getElementById("comp-cell-"+r.id);
+  if (!cell) return;
+  const compEl = cell.querySelector(".f-comprobante");
+  if (compEl) compEl.addEventListener("change", ()=>{
+    r.comprobante = compEl.value.trim();
+    persistRegistros();
+    cell.innerHTML = comprobanteHtml(r);
+    wireComprobanteCell(r);
+  });
+  const buscarEl = cell.querySelector(".f-buscar");
+  if (buscarEl) buscarEl.addEventListener("click", ()=> buscarComprobante(r));
+  const editToggle = cell.querySelector(".f-edit-comp");
+  if (editToggle) editToggle.addEventListener("click", ()=>{
+    const editRow = cell.querySelector(".comp-edit-row");
+    if (editRow){
+      editRow.classList.toggle("hidden");
+      const input = editRow.querySelector(".f-comprobante");
+      if (input && !editRow.classList.contains("hidden")) input.focus();
+    }
+  });
+  const previewContainer = cell.querySelector(".comp-preview");
+  const previewFrame = cell.querySelector(".comp-preview-frame");
+  const previewFallback = cell.querySelector(".comp-preview-fallback");
+  const previewOpenLink = cell.querySelector(".comp-preview-openlink");
+  cell.querySelectorAll(".f-preview-toggle").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      if (!previewContainer || !previewFrame) return;
+      const url = btn.dataset.url;
+      const isOpenForThis = !previewContainer.classList.contains("hidden") && previewContainer.dataset.openUrl === url;
+      if (isOpenForThis){
+        previewContainer.classList.add("hidden");
+        previewContainer.dataset.openUrl = "";
+        previewFrame.src = "";
+        return;
+      }
+      const fileId = btn.dataset.fileid;
+      previewContainer.dataset.openUrl = url;
+      previewContainer.classList.remove("hidden");
+      if (previewFallback) previewFallback.classList.add("hidden");
+      if (previewOpenLink) previewOpenLink.href = url;
+      previewFrame.classList.remove("hidden");
+      previewFrame.src = drivePreviewEmbedUrl(fileId);
+    });
+  });
+}
+
+/* ---------------- Add caregiver ---------------- */
+const CARE_COLORS = ["#E07A5F","#F2A541","#3D9970","#D1495B","#00798C","#9C6ADE"];
+function openAddCaregiverModal(){
+  requireAdmin(()=>{
+    const backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    const inp = "padding:9px 10px;border-radius:8px;border:1px solid var(--line);font-family:var(--sans);font-size:13.5px;color:var(--ink);";
+    backdrop.innerHTML = `
+      <div class="modal">
+        <h3>Agregar cuidadora</h3>
+        <div class="stack" style="margin-top:14px;">
+          <label style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);font-weight:600;">Nombre
+            <input type="text" id="ac-name" placeholder="Ej. María" style="${inp}" /></label>
+          <label style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);font-weight:600;">Turno
+            <select id="ac-turno" style="${inp}">
+              <option value="weekend">Fines de semana (sáb 7am – lun 7am)</option>
+              <option value="weekday-day">Diurno (lun–vie)</option>
+              <option value="weekday-night">Nocturno (lun–vie)</option>
+            </select></label>
+          <label style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);font-weight:600;">Pago (por semana lun–vie, o por fin de semana)
+            <input type="number" step="0.01" id="ac-rate" placeholder="70" style="${inp}" /></label>
+          <label style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);font-weight:600;">Primer sábado (o lunes) de trabajo
+            <input type="date" id="ac-start" style="${inp}" /></label>
+          <div style="display:flex;gap:10px;">
+            <label style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);font-weight:600;flex:1;">Sube a (opcional)
+              <input type="number" step="0.01" id="ac-rate2" placeholder="100" style="${inp}" /></label>
+            <label style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);font-weight:600;flex:1;">Desde la fecha
+              <input type="date" id="ac-from2" style="${inp}" /></label>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);">
+            <input type="checkbox" id="ac-fill" checked style="width:auto;" /> Crear las filas de pago desde esa fecha hasta el 31 de enero de 2027
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" id="ac-cancel">Cancelar</button>
+          <button class="btn btn-primary" id="ac-save">Agregar</button>
+        </div>
+      </div>`;
+    document.body.appendChild(backdrop);
+    const $ = (q)=>backdrop.querySelector(q);
+    $("#ac-cancel").addEventListener("click", ()=>backdrop.remove());
+    $("#ac-save").addEventListener("click", async ()=>{
+      const name = $("#ac-name").value.trim();
+      const rate = parseFloat($("#ac-rate").value);
+      const start = $("#ac-start").value;
+      const rate2 = parseFloat($("#ac-rate2").value)||0, from2 = $("#ac-from2").value;
+      if (!name || !(rate>0)){ showToast("Escriba el nombre y el pago."); return; }
+      let id = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"");
+      if (!id) id = "cuid"+Date.now();
+      if (state.config.caregivers.some(c=>c.id===id)){ showToast("Ya existe una cuidadora con ese nombre."); return; }
+      const t = $("#ac-turno").value;
+      const c = {
+        id, name, weeklyRate: rate,
+        turno: t==="weekend" ? "Fines de semana" : t==="weekday-day" ? "Diurno (lun–vie)" : "Nocturno (lun–vie)",
+        color: CARE_COLORS[state.config.caregivers.length % CARE_COLORS.length],
+        scheduleType: t==="weekend" ? "weekend" : "weekday"
+      };
+      state.config.caregivers.push(c);
+      await persistConfig();
+      let n = 0;
+      if ($("#ac-fill").checked && start){
+        const end = parseISO("2027-01-31");
+        const weekend = c.scheduleType==="weekend";
+        let d = parseISO(start);
+        const rows = [];
+        while (d <= end){
+          // Se archiva en la pestaña del viernes de esa semana (para fines de semana: el viernes anterior)
+          const friday = weekend ? addDays(d,-1) : addDays(d,4);
+          const info = periodInfo(c, toISO(d));
+          if (rate2>0 && from2 && toISO(d) >= from2) info.monto = rate2;
+          rows.push({
+            id:"r_"+c.id+"_"+toISO(d)+"_"+Math.random().toString(36).slice(2,7),
+            year:friday.getFullYear(), month:friday.getMonth()+1, semana:null,
+            periodStyle: weekend?"weekend":"weekday", cuidadoraId:c.id,
+            fecha:toISO(d), periodo:info.periodo, monto:info.monto,
+            metodo:"Transferencia", estado:"Pendiente", comprobante:""
+          });
+          d = addDays(d,7);
+        }
+        rows.forEach((r,i)=>{ r.semana = nextSemanaFor(r.year, r.month, r.cuidadoraId, rows.slice(0,i)); });
+        state.registros = state.registros.concat(rows);
+        n = rows.length;
+        await persistRegistros();
+      }
+      backdrop.remove();
+      render();
+      showToast(name+" agregada"+(n?(" con "+n+" filas de pago."):"."));
+    });
+  });
+}
+
+/* ---------------- Edit rates ---------------- */
+function openEditRatesModal(){
+  requireAdmin(()=>{
+    const backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    backdrop.innerHTML = `
+      <div class="modal">
+        <h3>Editar tarifas</h3>
+        <p class="muted small">Monto por semana para turnos de lunes a viernes; monto por fin de semana (sábado y domingo) para turnos de fin de semana.</p>
+        <div class="stack" style="margin-top:14px;">
+          ${state.config.caregivers.map(c=>`
+            <label style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);font-weight:600;">
+              <span><span class="care-dot" style="background:${c.color}"></span>${c.name} <span style="font-weight:400;">(${c.turno})</span></span>
+              <input type="number" step="0.01" class="rate-input" data-id="${c.id}" value="${c.weeklyRate}" style="padding:9px 10px;border-radius:8px;border:1px solid var(--line);font-family:var(--sans);font-size:13.5px;color:var(--ink);" />
+              <span style="display:flex;align-items:center;gap:6px;font-weight:400;"><input type="checkbox" class="inactive-input" data-id="${c.id}" ${c.inactive?"checked":""} style="width:auto;" /> Inactiva (ya no trabaja; no se le crean filas nuevas)</span>
+            </label>`).join("")}
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:16px;font-size:12px;color:var(--muted);">
+          <input type="checkbox" id="rates-apply-pending" style="width:auto;" />
+          Aplicar también a los pagos <b>pendientes</b> ya creados (no cambia los ya marcados como Pagado)
+        </label>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" id="rates-cancel">Cancelar</button>
+          <button class="btn btn-primary" id="rates-save">Guardar tarifas</button>
+        </div>
+      </div>`;
+    document.body.appendChild(backdrop);
+    backdrop.querySelector("#rates-cancel").addEventListener("click", ()=>backdrop.remove());
+    backdrop.querySelector("#rates-save").addEventListener("click", async ()=>{
+      const applyPending = backdrop.querySelector("#rates-apply-pending").checked;
+      const changes = {};
+      backdrop.querySelectorAll(".rate-input").forEach(inp=>{
+        const c = caregiverById(inp.dataset.id);
+        const val = parseFloat(inp.value)||0;
+        if (c && val !== c.weeklyRate){ changes[c.id] = val; c.weeklyRate = val; }
+      });
+      backdrop.querySelectorAll(".inactive-input").forEach(inp=>{
+        const c = caregiverById(inp.dataset.id);
+        if (c) c.inactive = inp.checked;
+      });
+      await persistConfig();
+      if (applyPending){
+        state.registros.forEach(r=>{
+          if (r.estado !== "Pagado" && changes[r.cuidadoraId] !== undefined){
+            const c = caregiverById(r.cuidadoraId);
+            r.monto = periodInfo(c, r.fecha).monto;   // tarifa nueva + recargo de feriados
+          }
+        });
+        await persistRegistros();
+      }
+      backdrop.remove();
+      render();
+      const names = Object.keys(changes).map(id=>caregiverById(id).name);
+      showToast(names.length ? ("Tarifa actualizada: "+names.join(", ")+".") : "Sin cambios.");
+    });
+  });
+}
+
+/* ---------------- Add month ---------------- */
+function addNextMonth(){
+  requireAdmin(async ()=>{
+    const startMonday = nextWeeklyStartMonday();
+    const newRows = generateWeekdayPeriods(startMonday, 1, activeCaregivers());
+    newRows.forEach((r,i)=>{ r.semana = nextSemanaFor(r.year, r.month, r.cuidadoraId, newRows.slice(0,i)); });
+    state.registros = state.registros.concat(newRows);
+    await persistRegistros();
+    const y = newRows[0].year, m = newRows[0].month;
+    state.view = monthKey(y,m);
+    render();
+    showToast(`Semana del ${fmtDate(newRows[0].fecha)} agregada (lunes a viernes).`);
+  });
+}
+
+/* ---------------- Add single row (manual payment) ---------------- */
+// Primera semana (lun–vie) o fin de semana (sáb–dom) de este mes que la cuidadora todavía no tiene.
+function suggestStartDate(c, y, m){
+  const weekend = scheduleTypeOf(c) === "weekend";
+  const mine = state.registros.filter(r=>r.cuidadoraId===c.id);
+  const existing = new Set(mine.filter(r=>r.year===y && r.month===m).map(r=>String(r.periodo).trim()));
+  const usedDates = new Set(mine.map(r=>r.fecha));   // también evita semanas que viven en otro mes
+  const cands = [];
+  const from = new Date(y, m-1, 1-6), to = new Date(y, m-1, daysInMonth(y,m));
+  for (let dt = from; dt <= to; dt = addDays(dt, 1)){
+    if (weekend){
+      if (dt.getDay()===6 && dt.getMonth()===m-1) cands.push(new Date(dt));
+    } else if (dt.getDay()===1){
+      const fri = addDays(dt, 4);
+      if (fri.getFullYear()===y && fri.getMonth()===m-1) cands.push(new Date(dt));
+    }
+  }
+  const free = cands.find(dt => !usedDates.has(toISO(dt)) && !existing.has(periodInfo(c, toISO(dt)).periodo));
+  return toISO(free || cands[cands.length-1] || new Date(y, m-1, 1));
+}
+
+function openAddRowModal(y,m){
+  requireAdmin(()=>{
+    const backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    backdrop.innerHTML = `
+      <div class="modal">
+        <h3>Agregar pago — ${monthLabel(y,m)}</h3>
+        <p class="muted small">Solo se agrega esta fila; no cambia las demás. La fecha es el lunes (turnos lun–vie) o el sábado (fines de semana), y el período se calcula solo.</p>
+        <div class="form-grid">
+          <label>Cuidadora
+            <select id="nf-cuidadora">${activeCaregivers().concat(state.config.caregivers.filter(c=>c.inactive)).map(c=>`<option value="${c.id}">${c.name}${c.inactive?" (inactiva)":""}</option>`).join("")}</select>
+          </label>
+          <label>Fecha
+            <input type="date" id="nf-fecha" value="${isoDate(y,m,1)}" />
+          </label>
+          <label>Semana
+            <input type="number" id="nf-semana" value="1" min="1" />
+          </label>
+          <label>Período
+            <input type="text" id="nf-periodo" placeholder="ej. 17–18 octubre" />
+          </label>
+          <label>Monto
+            <input type="number" step="0.01" id="nf-monto" value="0" />
+          </label>
+          <label>Método
+            <select id="nf-metodo">${METODOS.map(x=>`<option>${x}</option>`).join("")}</select>
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" id="nf-cancel">Cancelar</button>
+          <button class="btn btn-primary" id="nf-save">Agregar</button>
+        </div>
+      </div>`;
+    document.body.appendChild(backdrop);
+    const cuidSel = backdrop.querySelector("#nf-cuidadora");
+    const fechaInp = backdrop.querySelector("#nf-fecha");
+    const semanaInp = backdrop.querySelector("#nf-semana");
+    const periodoInp = backdrop.querySelector("#nf-periodo");
+    const montoInp = backdrop.querySelector("#nf-monto");
+
+    // Con la fecha elegida se calculan período y monto (incluye el recargo de feriados).
+    function fillFromDate(){
+      const c = caregiverById(cuidSel.value);
+      if (!c || !fechaInp.value) return;
+      const info = periodInfo(c, fechaInp.value);
+      periodoInp.value = info.periodo;
+      montoInp.value = info.monto;
+    }
+    // Al elegir cuidadora se sugiere la primera semana/fin de semana que le falta en este mes.
+    function fillForCaregiver(){
+      const c = caregiverById(cuidSel.value);
+      if (!c) return;
+      fechaInp.value = suggestStartDate(c, y, m);
+      semanaInp.value = nextSemanaFor(y, m, c.id);
+      fillFromDate();
+    }
+    cuidSel.addEventListener("change", fillForCaregiver);
+    fechaInp.addEventListener("change", fillFromDate);
+    fillForCaregiver();
+
+    backdrop.querySelector("#nf-cancel").addEventListener("click", ()=>backdrop.remove());
+    backdrop.querySelector("#nf-save").addEventListener("click", async ()=>{
+      const c = caregiverById(cuidSel.value);
+      if (!fechaInp.value) return showToast("Elija una fecha.");
+      const row = {
+        id: "r_manual_"+Date.now()+"_"+Math.random().toString(36).slice(2,7),
+        year:y, month:m,
+        semana: parseInt(semanaInp.value)||1,
+        periodStyle: scheduleTypeOf(c)==="weekend" ? "weekend" : "weekday",
+        cuidadoraId: cuidSel.value,
+        fecha: fechaInp.value,
+        periodo: periodoInp.value || "—",
+        monto: parseFloat(montoInp.value)||0,
+        metodo: backdrop.querySelector("#nf-metodo").value,
+        estado: "Pendiente",
+        comprobante: ""
+      };
+      state.registros.push(row);
+      await persistRegistros();
+      backdrop.remove();
+      render();
+      showToast("Pago agregado.");
+    });
+  });
+}
+
+/* ---------------- Boot ---------------- */
+if (initSupabase()) {
+  initOwnerSession().then((session) => { if (session) loadAll(); });
+}
+</script>
+</body>
+</html>
